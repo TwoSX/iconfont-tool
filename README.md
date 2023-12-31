@@ -5,6 +5,7 @@
 - 支持多项目，多项目之间互不影响。
 - svg 生成 iconfont.ttf 文件。
 - 支持生成 dart, css, swift 代码。
+- 支持用户认证，限制公开访问。
 
 ## 安装
 
@@ -13,3 +14,10 @@ docker pull twosx/iconfont-tool:latest
 
 docker run -d -p 8080:8080 -v ./data:/app/data --name iconfont-tool twosx/iconfont-tool:latest
 ```
+
+### 环境变量
+
+| 变量名                 | 说明     | 默认值   |
+|---------------------|--------|-------|
+| TOOL_ADMIN_USERNAME | 初始登录用户 | admin |
+| TOOL_ADMIN_PASSWORD | 初始登录密码 | admin |

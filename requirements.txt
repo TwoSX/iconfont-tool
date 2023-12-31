@@ -1,3 +1,4 @@
 nicegui~=1.4.8
 lxml~=5.0.0
 tortoise-orm~=0.20.0
+ruff~=0.1.9
