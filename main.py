@@ -9,6 +9,7 @@ import models
 import fontforge
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.responses import FileResponse
 
 
 async def init_db() -> None:
@@ -161,52 +162,6 @@ async def handle_upload(e: events.UploadEventArguments, p: models.Project):
     refresh_icons()
 
 
-async def download_ttf(p: models.Project):
-    icons = await models.Icon.filter(project_id=p.id).all()
-    if not icons:
-        return
-    # 把每个 icon 的 content 写入到 build/svg/name.svg
-
-    # 判断 build/svg 是否存在，不存在则创建，存在则清空
-    if not os.path.exists("build/svg"):
-        os.makedirs("build/svg")
-    else:
-        for file in os.listdir("build/svg"):
-            os.remove(f"build/svg/{file}")
-
-    # 如果存在 build/iconfont.ttf 则删除
-    if os.path.exists("build/iconfont.ttf"):
-        os.remove("build/iconfont.ttf")
-
-    # 创建新字体
-    font = fontforge.font()
-    font.encoding = "UnicodeFull"
-    font.familyname = "iconfont"
-    font.fullname = "iconfont"
-    font.fontname = "iconfont"
-
-    for icon in icons:
-        with open(f"build/svg/{icon.name}.svg", "w") as f1:
-            f1.write(icon.content)
-
-        glyph = font.createChar(int(icon.unicode(), 16))
-        glyph.importOutlines(f"build/svg/{icon.name}.svg")
-
-        # 指定字体名称
-        glyph.glyphname = icon.name
-        glyph.width = 512
-        glyph.left_side_bearing = 0
-        glyph.right_side_bearing = 0
-        glyph.round()
-        glyph.simplify()
-        glyph.correctDirection()
-
-    # 保存字体文件
-    font.generate("build/iconfont.ttf")
-
-    ui.download("build/iconfont.ttf")
-
-
 async def generate_dart(p: models.Project):
     icons = await models.Icon.filter(project_id=p.id).all()
     if not icons:
@@ -348,17 +303,75 @@ async def project_detail(project_id: int):
     )
 
     with ui.row().classes("w-full items-center"):
-        ui.button(icon="home", on_click=lambda p=project: ui.open(f"/")).props('flat round color="blue"')
+        ui.button(icon="home", on_click=lambda p=project: ui.open("/")).props('flat round color="blue"')
         ui.label("项目：" + project.name).classes("text-3xl")
         ui.upload(
             multiple=True, label="上传图标", on_upload=lambda e: handle_upload(e, project), auto_upload=True
         ).props("accept=.svg").style("width: 210px")
-        ui.button("下载字体文件", on_click=lambda p=project: download_ttf(p)).style("height: 52px")
+        ui.button("下载字体文件", on_click=lambda p=project: ui.open(f"/download/{p.id}")).style("height: 52px")
         ui.button("复制dart", on_click=lambda p=project: generate_dart(p)).style("height: 52px")
         ui.button("复制css", on_click=lambda p=project: generate_css(p)).style("height: 52px")
         ui.button("复制swift", on_click=lambda p=project: generate_swift(p)).style("height: 52px")
 
     await list_of_icons(project)
+
+
+@app.get(path="/download/{project_id}", dependencies=[Depends(authorize)])
+async def download_ttf(project_id):
+    icons = await models.Icon.filter(project_id=project_id).all()
+    if not icons:
+        return
+
+    # 获取当前 project 根目录
+    root_path = os.path.dirname(os.path.abspath(__file__))
+
+    build_path = os.path.join(root_path, "build")
+
+    svg_path = os.path.join(build_path, "svg")
+
+    ttf_path = os.path.join(build_path, "iconfont.ttf")
+
+    # 把每个 icon 的 content 写入到 build/svg/name.svg
+
+    # 判断 build/svg 是否存在，不存在则创建，存在则清空
+    if not os.path.exists(svg_path):
+        os.makedirs(svg_path)
+    else:
+        for file in os.listdir(svg_path):
+            os.remove(os.path.join(svg_path, file))
+
+    # 如果存在 build/iconfont.ttf 则删除
+    if os.path.exists(ttf_path):
+        os.remove(ttf_path)
+
+    # 创建新字体
+    font = fontforge.font()
+    font.encoding = "UnicodeFull"
+    font.familyname = "iconfont"
+    font.fullname = "iconfont"
+    font.fontname = "iconfont"
+
+    for icon in icons:
+        icon_path = os.path.join(svg_path, f"{icon.name}.svg")
+        with open(icon_path, "w") as f1:
+            f1.write(icon.content)
+
+        glyph = font.createChar(int(icon.unicode(), 16))
+        glyph.importOutlines(icon_path)
+
+        # 指定字体名称
+        glyph.glyphname = icon.name
+        glyph.width = 512
+        glyph.left_side_bearing = 0
+        glyph.right_side_bearing = 0
+        glyph.round()
+        glyph.simplify()
+        glyph.correctDirection()
+
+    # 保存字体文件
+    font.generate(ttf_path)
+
+    return FileResponse(path=ttf_path, filename="iconfont.ttf", media_type="application/octet-stream")
 
 
 ui.run(title="iconfont 管理工具", favicon="🚀")
