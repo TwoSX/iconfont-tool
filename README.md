@@ -7,6 +7,8 @@
 - 支持生成 dart, css, swift 代码。
 - 支持用户认证，限制公开访问。
 
+![截图](./screenshot.png)
+
 ## 安装
 
 ```shell
