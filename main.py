@@ -1,6 +1,8 @@
 import os
 import time
 from typing import List
+
+import psMat
 from tortoise import Tortoise
 from nicegui import app, ui, events
 from lxml import etree
@@ -350,6 +352,13 @@ async def download_ttf(project_id):
     font.familyname = "iconfont"
     font.fullname = "iconfont"
     font.fontname = "iconfont"
+    
+    font.em = 1000
+    font.ascent = 800
+    font.descent = 200
+
+    # 计算垂直居中的位置
+    vcenter = (font.ascent - font.descent / 2) / 2
 
     for icon in icons:
         icon_path = os.path.join(svg_path, f"{icon.name}.svg")
@@ -357,16 +366,20 @@ async def download_ttf(project_id):
             f1.write(icon.content)
 
         glyph = font.createChar(int(icon.unicode(), 16))
-        glyph.importOutlines(icon_path)
+        glyph.importOutlines(icon_path, ('removeoverlap', 'correctdir'))
+        glyph.removeOverlap()
 
         # 指定字体名称
         glyph.glyphname = icon.name
-        glyph.width = 512
-        glyph.left_side_bearing = 0
-        glyph.right_side_bearing = 0
-        glyph.round()
-        glyph.simplify()
-        glyph.correctDirection()
+        # 设置字体的宽度
+        glyph.width = 1000
+
+        # 垂直居中
+        bounding = glyph.boundingBox()  # xmin,ymin,xmax,ymax
+        glyphcenter = (bounding[3] - bounding[1]) / 2 + bounding[1]
+        deltay = vcenter - glyphcenter
+        matrix = psMat.translate(0, deltay)
+        glyph.transform(matrix)
 
     # 保存字体文件
     font.generate(ttf_path)
